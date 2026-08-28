@@ -60,6 +60,7 @@ Fill in your `.env`:
 DATABASE_URL="postgresql://user:password@localhost:5432/gta_garage"
 JWT_SECRET="generate-a-long-random-secret"
 ADMIN_EMAILS="admin@example.com"
+APP_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 SECURITY_RATE_LIMIT_PER_MINUTE="120"
 SECURITY_AUTH_RATE_LIMIT_PER_MINUTE="20"
@@ -128,7 +129,7 @@ TELEGRAM_WEBHOOK_SECRET="generate-a-random-webhook-secret"
 TELEGRAM_BOT_USERNAME="your_gta_garage_bot"
 ```
 
-After deploying the app to HTTPS, register the webhook. Telegram cannot send bot updates to `localhost` or `127.0.0.1`; for local testing, use a public HTTPS tunnel and set `NEXT_PUBLIC_APP_URL` to that tunnel URL.
+After deploying the app to HTTPS, register the webhook. Telegram cannot send bot updates to `localhost` or `127.0.0.1`; for local testing, use a public HTTPS tunnel and set `APP_URL` and `NEXT_PUBLIC_APP_URL` to that tunnel URL.
 
 ```bash
 curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \

@@ -2,7 +2,8 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM = process.env.EMAIL_FROM ?? 'GTA Garage <noreply@example.com>'
-const DEFAULT_APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+const DEFAULT_APP_URL =
+  process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
 function appUrl(appUrlOverride?: string) {
   return (appUrlOverride ?? DEFAULT_APP_URL).replace(/\/$/, '')

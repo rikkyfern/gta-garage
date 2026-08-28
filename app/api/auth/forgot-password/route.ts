@@ -1,52 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { forgotPasswordSchema } from '@/lib/validations/auth'
-import { getPasswordResetLink, sendPasswordResetEmail } from '@/lib/email'
+import { resolveAppUrl } from '@/lib/app-url'
+import { checkEmailRateLimit } from '@/lib/email-rate-limit'
+import {
+  getConfirmationLink,
+  getPasswordResetLink,
+  sendConfirmationEmail,
+  sendPasswordResetEmail,
+} from '@/lib/email'
 import { isDatabaseSchemaOutOfDate, isDatabaseUnavailable } from '@/lib/prisma-errors'
+import crypto from 'crypto'
 
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
-const RATE_LIMIT_MAX_REQUESTS = 3
 const SUCCESS_MESSAGE = 'If that email is registered, you will receive a reset link shortly.'
-
-function getAppUrl(req: NextRequest) {
-  if (process.env.NODE_ENV !== 'production') {
-    return req.nextUrl.origin
-  }
-
-  return process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
-}
-
-function rateLimitKey(email: string) {
-  return crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
-}
-
-async function checkRateLimit(email: string): Promise<boolean> {
-  const emailHash = rateLimitKey(email)
-  const now = new Date()
-  const resetAt = new Date(now.getTime() + RATE_LIMIT_WINDOW_MS)
-
-  return prisma.$transaction(async (tx) => {
-    const entry = await tx.passwordResetRateLimit.findUnique({ where: { emailHash } })
-
-    if (!entry || entry.resetAt <= now) {
-      await tx.passwordResetRateLimit.upsert({
-        where: { emailHash },
-        create: { emailHash, requestCount: 1, resetAt },
-        update: { requestCount: 1, resetAt },
-      })
-      return true
-    }
-
-    if (entry.requestCount >= RATE_LIMIT_MAX_REQUESTS) return false
-
-    await tx.passwordResetRateLimit.update({
-      where: { emailHash },
-      data: { requestCount: { increment: 1 } },
-    })
-    return true
-  })
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,9 +24,9 @@ export async function POST(req: NextRequest) {
     }
 
     const { email } = result.data
-    const appUrl = getAppUrl(req)
+    const appUrl = resolveAppUrl(req)
 
-    if (!(await checkRateLimit(email))) {
+    if (!(await checkEmailRateLimit(email, 'password-reset'))) {
       return NextResponse.json(
         { error: 'Too many requests. Please wait 15 minutes before trying again.' },
         { status: 429 }
@@ -69,6 +35,45 @@ export async function POST(req: NextRequest) {
 
     // Always return success to prevent email enumeration
     const user = await prisma.user.findUnique({ where: { email } })
+
+    if (user && !user.emailVerified) {
+      const token = crypto.randomBytes(32).toString('hex')
+      await prisma.emailVerificationToken.create({
+        data: {
+          userId: user.id,
+          token,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      })
+
+      try {
+        await sendConfirmationEmail(email, token, appUrl)
+      } catch (error) {
+        console.error('[forgot-password:confirmation-email]', error)
+
+        if (process.env.NODE_ENV !== 'production') {
+          return NextResponse.json({
+            message:
+              'This account still needs email confirmation. Email delivery is unavailable in this local environment, so use the confirmation link below.',
+            confirmationUrl: getConfirmationLink(token, appUrl),
+            emailDelivery: 'failed',
+          })
+        }
+
+        return NextResponse.json({
+          message:
+            'This account still needs email confirmation. Try resending the confirmation link before resetting your password.',
+        })
+      }
+
+      return NextResponse.json({
+        message:
+          'This account still needs email confirmation. A new confirmation link has been sent.',
+        ...(process.env.NODE_ENV !== 'production'
+          ? { confirmationUrl: getConfirmationLink(token, appUrl), emailDelivery: 'sent' }
+          : {}),
+      })
+    }
 
     if (user) {
       const token = crypto.randomBytes(32).toString('hex')

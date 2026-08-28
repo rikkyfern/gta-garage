@@ -3,20 +3,14 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { registerSchema } from '@/lib/validations/auth'
+import { resolveAppUrl } from '@/lib/app-url'
+import { checkEmailRateLimit } from '@/lib/email-rate-limit'
 import { getConfirmationLink, sendConfirmationEmail } from '@/lib/email'
 import {
   getPrismaErrorCode,
   isDatabaseSchemaOutOfDate,
   isDatabaseUnavailable,
 } from '@/lib/prisma-errors'
-
-function getAppUrl(req: NextRequest) {
-  if (process.env.NODE_ENV !== 'production') {
-    return req.nextUrl.origin
-  }
-
-  return process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,19 +26,77 @@ export async function POST(req: NextRequest) {
 
     const { username, email, password } = result.data
 
-    const appUrl = getAppUrl(req)
+    const appUrl = resolveAppUrl(req)
     const token = crypto.randomBytes(32).toString('hex')
     const hashedPassword = await bcrypt.hash(password, 12)
     let createdUserId: string | null = null
 
     try {
-      const existing = await prisma.user.findFirst({
-        where: { OR: [{ email }, { username }] },
-      })
+      const [existingEmailUser, existingUsernameUser] = await Promise.all([
+        prisma.user.findUnique({ where: { email } }),
+        prisma.user.findUnique({ where: { username } }),
+      ])
 
-      if (existing) {
-        const field = existing.email === email ? 'Email' : 'Username'
-        return NextResponse.json({ error: `${field} is already taken` }, { status: 409 })
+      if (existingUsernameUser && existingUsernameUser.email !== email) {
+        return NextResponse.json({ error: 'Username is already taken' }, { status: 409 })
+      }
+
+      if (existingEmailUser) {
+        if (existingEmailUser.emailVerified) {
+          return NextResponse.json({ error: 'Email is already taken' }, { status: 409 })
+        }
+
+        if (!(await checkEmailRateLimit(email, 'email-confirmation'))) {
+          return NextResponse.json(
+            { error: 'Too many requests. Please wait 15 minutes before trying again.' },
+            { status: 429 }
+          )
+        }
+
+        await prisma.emailVerificationToken.create({
+          data: {
+            userId: existingEmailUser.id,
+            token,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        })
+
+        try {
+          await sendConfirmationEmail(email, token, appUrl)
+        } catch (error) {
+          console.error('[register:resend-email]', error)
+
+          if (process.env.NODE_ENV !== 'production') {
+            return NextResponse.json(
+              {
+                message:
+                  'This email already has an unconfirmed account. Email delivery is unavailable in this local environment, so use the confirmation link below.',
+                confirmationUrl: getConfirmationLink(token, appUrl),
+                emailDelivery: 'failed',
+              },
+              { status: 200 }
+            )
+          }
+
+          return NextResponse.json(
+            {
+              error:
+                'This email already has an unconfirmed account, but email service is unavailable. Try resending the confirmation link again.',
+            },
+            { status: 503 }
+          )
+        }
+
+        return NextResponse.json(
+          {
+            message:
+              'This email already has an unconfirmed account. A new confirmation link has been sent.',
+            ...(process.env.NODE_ENV !== 'production'
+              ? { confirmationUrl: getConfirmationLink(token, appUrl), emailDelivery: 'sent' }
+              : {}),
+          },
+          { status: 200 }
+        )
       }
 
       const user = await prisma.user.create({

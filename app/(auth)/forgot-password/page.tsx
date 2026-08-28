@@ -1,20 +1,30 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, MailCheck, Send } from 'lucide-react'
 import { ErrorMessage, SuccessMessage } from '@/components/ui/ErrorMessage'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState<{ message: string; resetUrl?: string } | null>(null)
+  const [success, setSuccess] = useState<{
+    message: string
+    resetUrl?: string
+    confirmationUrl?: string
+  } | null>(null)
+  const [confirmationSuccess, setConfirmationSuccess] = useState<{
+    message: string
+    confirmationUrl?: string
+  } | null>(null)
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setSuccess(null)
+    setConfirmationSuccess(null)
     setLoading(true)
 
     try {
@@ -34,11 +44,43 @@ export default function ForgotPasswordPage() {
       setSuccess({
         message: data.message ?? 'If that email is registered, you will receive a reset link shortly.',
         resetUrl: data.resetUrl,
+        confirmationUrl: data.confirmationUrl,
       })
     } catch {
       setError('Network error. Check that the app server is running, then try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleResendConfirmation() {
+    setError('')
+    setSuccess(null)
+    setConfirmationSuccess(null)
+    setResending(true)
+
+    try {
+      const res = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setError(data.error ?? 'Could not resend confirmation email')
+        return
+      }
+
+      setConfirmationSuccess({
+        message: data.message ?? 'A new confirmation link has been sent. Please check your email.',
+        confirmationUrl: data.confirmationUrl,
+      })
+    } catch {
+      setError('Network error. Check that the app server is running, then try again.')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -68,9 +110,20 @@ export default function ForgotPasswordPage() {
 
         {error && <ErrorMessage message={error} />}
         {success && <SuccessMessage message={success.message} />}
+        {confirmationSuccess && <SuccessMessage message={confirmationSuccess.message} />}
         {success?.resetUrl && (
           <Link href={success.resetUrl} className="block text-sm text-garage-neon hover:underline">
             Open local reset link
+          </Link>
+        )}
+        {success?.confirmationUrl && (
+          <Link href={success.confirmationUrl} className="block text-sm text-garage-neon hover:underline">
+            Open local confirmation link
+          </Link>
+        )}
+        {confirmationSuccess?.confirmationUrl && (
+          <Link href={confirmationSuccess.confirmationUrl} className="block text-sm text-garage-neon hover:underline">
+            Open local confirmation link
           </Link>
         )}
 
@@ -82,6 +135,15 @@ export default function ForgotPasswordPage() {
         >
           {loading ? <LoadingSpinner size="sm" /> : <Send className="h-4 w-4" aria-hidden="true" />}
           Send Reset Link
+        </button>
+        <button
+          type="button"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#b8dce9] bg-white px-5 py-3 text-sm font-semibold text-[#258fe6] transition-all hover:bg-[#f1f9fc] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={resending || !email}
+          onClick={handleResendConfirmation}
+        >
+          {resending ? <LoadingSpinner size="sm" /> : <MailCheck className="h-4 w-4" aria-hidden="true" />}
+          Resend Confirmation Email
         </button>
       </form>
 

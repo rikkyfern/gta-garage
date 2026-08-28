@@ -3,16 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LogIn, ShieldCheck } from 'lucide-react'
-import { ErrorMessage } from '@/components/ui/ErrorMessage'
+import { LogIn, MailCheck, ShieldCheck } from 'lucide-react'
+import { ErrorMessage, SuccessMessage } from '@/components/ui/ErrorMessage'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 
 export default function LoginPage() {
   const router = useRouter()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState<{ message: string; confirmationUrl?: string } | null>(null)
   const [blockedNotice, setBlockedNotice] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
 
   useEffect(() => {
     const isBlockedRedirect = new URLSearchParams(window.location.search).get('blocked') === '1'
@@ -26,6 +28,7 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    setSuccess(null)
     setLoading(true)
 
     try {
@@ -48,6 +51,36 @@ export default function LoginPage() {
       setError('Authentication server is not reachable. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleResendConfirmation() {
+    setError('')
+    setSuccess(null)
+    setResending(true)
+
+    try {
+      const res = await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        setError(data.error ?? 'Could not resend confirmation email')
+        return
+      }
+
+      setSuccess({
+        message: data.message ?? 'A new confirmation link has been sent. Please check your email.',
+        confirmationUrl: data.confirmationUrl,
+      })
+    } catch {
+      setError('Authentication server is not reachable. Please try again.')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -98,6 +131,23 @@ export default function LoginPage() {
           <div id="login-error">
             <ErrorMessage message={error || blockedNotice} />
           </div>
+        )}
+        {error === 'Please confirm your email before logging in.' && (
+          <button
+            type="button"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#b8dce9] bg-white px-5 py-3 text-sm font-semibold text-[#258fe6] transition-all hover:bg-[#f1f9fc] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={resending || !form.email}
+            onClick={handleResendConfirmation}
+          >
+            {resending ? <LoadingSpinner size="sm" /> : <MailCheck className="h-4 w-4" aria-hidden="true" />}
+            Resend Confirmation Email
+          </button>
+        )}
+        {success && <SuccessMessage message={success.message} />}
+        {success?.confirmationUrl && (
+          <Link href={success.confirmationUrl} className="block text-sm text-garage-neon hover:underline">
+            Open local confirmation link
+          </Link>
         )}
 
         <button
