@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  avatar    String?
+  bio       String?
+  role      UserRole @default(USER)
+  blockedAt DateTime?
+  blockReason String?
+  warnedAt DateTime?
+  emailVerified Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  garages              Garage[]
+  cars                 Car[]
+  carPhotos            CarPhoto[]
+  sentFriendRequests   FriendRequest[] @relation("SentRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedRequests")
+  friendshipsA         Friendship[]    @relation("FriendA")
+  friendshipsB         Friendship[]    @relation("FriendB")
+  activities           Activity[]
+  activityLikes        ActivityLike[]
+  activityComments     ActivityComment[]
+  passwordResetTokens  PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  telegramAccount      TelegramAccount?
+  telegramLinkTokens   TelegramLinkToken[]
+  adminWarningsReceived AdminWarning[] @relation("WarningsReceived")
+  adminWarningsSent     AdminWarning[] @relation("WarningsSent")
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Garage {
+  id          String   @id @default(cuid())
+  userId      String
+  garageName  String
+  location    String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cars       Car[]
+  activities Activity[]
+
+  @@map("garages")
+}
+
+model Car {
+  id          String   @id @default(cuid())
+  garageId    String
+  userId      String
+  carName     String
+  carModel    String?
+  description String?
+  location    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  garage     Garage     @relation(fields: [garageId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos     CarPhoto[]
+  activities Activity[]
+
+  @@map("cars")
+}
+
+model CarPhoto {
+  id        String   @id @default(cuid())
+  carId     String
+  userId    String
+  imageUrl  String
+  publicId  String   // Cloudinary public_id for deletion
+  caption   String?
+  createdAt DateTime @default(now())
+
+  car        Car        @relation(fields: [carId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activities Activity[]
+
+  @@map("car_photos")
+}
+
+model FriendRequest {
+  id         String              @id @default(cuid())
+  senderId   String
+  receiverId String
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  sender   User @relation("SentRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@map("friend_requests")
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  createdAt DateTime @default(now())
+
+  userA User @relation("FriendA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("FriendB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@map("friendships")
+}
+
+model Activity {
+  id           String       @id @default(cuid())
+  userId       String
+  activityType ActivityType
+  garageId     String?
+  carId        String?
+  carPhotoId   String?
+  createdAt    DateTime     @default(now())
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  garage   Garage?         @relation(fields: [garageId], references: [id], onDelete: SetNull)
+  car      Car?            @relation(fields: [carId], references: [id], onDelete: SetNull)
+  carPhoto CarPhoto?       @relation(fields: [carPhotoId], references: [id], onDelete: SetNull)
+  likes    ActivityLike[]
+  comments ActivityComment[]
+
+  @@map("activities")
+}
+
+enum ActivityType {
+  GARAGE_CREATED
+  CAR_ADDED
+  PHOTO_UPLOADED
+}
+
+model ActivityLike {
+  id         String   @id @default(cuid())
+  activityId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, userId])
+  @@map("activity_likes")
+}
+
+model ActivityComment {
+  id          String   @id @default(cuid())
+  activityId  String
+  userId      String
+  commentText String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("activity_comments")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model PasswordResetRateLimit {
+  emailHash    String   @id
+  requestCount Int      @default(1)
+  resetAt      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("password_reset_rate_limits")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_verification_tokens")
+}
+
+model TelegramAccount {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  telegramUserId   String   @unique
+  telegramUsername String?
+  firstName        String?
+  lastName         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("telegram_accounts")
+}
+
+model TelegramLinkToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("telegram_link_tokens")
+}
+
+model AdminWarning {
+  id        String   @id @default(cuid())
+  userId    String
+  adminId   String
+  reason    String
+  message   String
+  createdAt DateTime @default(now())
+
+  user  User @relation("WarningsReceived", fields: [userId], references: [id], onDelete: Cascade)
+  admin User @relation("WarningsSent", fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_warnings")
+}
+
+model IpControl {
+  ipAddress     String    @id
+  requestCount  Int       @default(0)
+  scanCount     Int       @default(0)
+  blocked       Boolean   @default(false)
+  blockReason   String?
+  firstSeenAt   DateTime  @default(now())
+  lastSeenAt    DateTime  @default(now())
+  windowStartedAt DateTime @default(now())
+  blockedAt     DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  logs IpAccessLog[]
+
+  @@map("ip_controls")
+}
+
+model IpAccessLog {
+  id         String   @id @default(cuid())
+  ipAddress  String
+  method     String
+  path       String
+  userAgent  String?
+  referer    String?
+  status     Int?
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  ipControl IpControl @relation(fields: [ipAddress], references: [ipAddress], onDelete: Cascade)
+
+  @@index([ipAddress, createdAt])
+  @@index([path, createdAt])
+  @@map("ip_access_logs")
+}

@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #f8fbfc;
+    --surface: #ffffff;
+    --panel: #ffffff;
+    --border: #e1e9ee;
+    --muted: #f1f6f8;
+    --text: #1b2433;
+    --subtle: #637284;
+    --neon: #23876c;
+    --neon-blue: #258fe6;
+    --neon-amber: #c28717;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    min-height: 100vh;
+    background:
+      linear-gradient(130deg, rgba(248, 251, 252, 0.98) 0%, rgba(255, 255, 255, 0.98) 48%, rgba(238, 248, 245, 0.98) 100%),
+      repeating-linear-gradient(90deg, rgba(29, 44, 60, 0.035) 0 1px, transparent 1px 112px),
+      repeating-linear-gradient(0deg, rgba(29, 44, 60, 0.024) 0 1px, transparent 1px 112px);
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: rgba(37, 143, 230, 0.18);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--subtle);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-garage-border/80 bg-garage-surface/95 shadow-card backdrop-blur;
+  }
+
+  .panel {
+    @apply rounded-lg border border-garage-border/70 bg-garage-panel/90 shadow-card;
+  }
+
+  .interactive-card {
+    @apply card transition-all duration-200 hover:-translate-y-0.5 hover:border-garage-neon-blue/30 hover:bg-garage-panel hover:shadow-neon-blue;
+  }
+
+  .page-header {
+    @apply mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between;
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.22em] text-garage-neon-blue;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-garage-neon-blue px-5 py-2.5
+           text-sm font-semibold text-white shadow-neon-blue transition-all duration-150
+           hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-garage-border/80
+           bg-garage-muted/80 px-5 py-2.5 text-sm font-medium text-garage-text
+           transition-all duration-150 hover:border-garage-neon-blue/35 hover:bg-garage-panel
+           active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-red-400/25
+           bg-red-500/10 px-5 py-2.5 text-sm font-medium text-red-700
+           transition-all duration-150 hover:bg-red-500/20 active:scale-[0.98];
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-garage-border/80 bg-garage-muted/75 px-4 py-2.5
+           text-sm text-garage-text placeholder-garage-subtle/70 outline-none transition-all duration-150
+           focus:border-garage-neon/60 focus:bg-garage-panel focus:ring-2 focus:ring-garage-neon/20;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-garage-subtle;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium;
+  }
+
+  .badge-neon {
+    @apply badge bg-garage-neon/10 text-garage-neon border border-garage-neon/20;
+  }
+
+  .badge-blue {
+    @apply badge bg-garage-neon-blue/10 text-garage-neon-blue border border-garage-neon-blue/20;
+  }
+
+  .badge-amber {
+    @apply badge bg-garage-neon-amber/10 text-garage-neon-amber border border-garage-neon-amber/20;
+  }
+
+  .page-title {
+    @apply text-3xl font-semibold tracking-tight text-garage-text;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold tracking-tight text-garage-text;
+  }
+
+  .muted-link {
+    @apply text-sm text-garage-subtle transition-colors hover:text-garage-text;
+  }
+
+  .metric-value {
+    @apply text-3xl font-semibold tracking-tight text-garage-text;
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "gta-garage",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy && prisma generate",
+    "db:wipe": "node scripts/db-reset.mjs --wipe --yes",
+    "db:restart": "node scripts/db-reset.mjs --seed --yes",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.3.1",
+    "jose": "^5.4.1",
+    "lucide-react": "^1.31.0",
+    "next": "^16.2.6",
+    "react": "^18",
+    "react-dom": "^18",
+    "resend": "^3.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.19",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "postcss": "^8",
+    "prisma": "^5.14.0",
+    "tailwindcss": "^3.4.4",
+    "tsx": "^4.15.7",
+    "typescript": "^5"
+  }
+}
